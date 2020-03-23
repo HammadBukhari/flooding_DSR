@@ -9,7 +9,7 @@ void main() {
   var provider = getIt<NodeProvider>();
   provider.initNodes();
   for (var node in provider.nodes) {
-    print(node.toString());
-    print("\n");
+    print("${node.toString()}\n");
+    
   }
 }
