@@ -22,6 +22,9 @@ dependencies:
   connectivity: ^0.4.8+2
   provider: ^4.0.4
   get_it: ^4.0.1
+  dartz: ^0.8.9
+  uuid: ^2.0.4
+
 
 
 
