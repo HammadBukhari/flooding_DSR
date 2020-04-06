@@ -52,6 +52,7 @@ class Node {
   }
 
   void addGlobalEdge(GlobalEdge edge) {
+    streamController.sink.add(Left(NodeState.newEdgeAdded));
     edges.add(edge);
   }
 

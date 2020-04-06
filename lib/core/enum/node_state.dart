@@ -4,5 +4,6 @@ enum NodeState{
   packetDrop,
   connectionLoss,
   connectionEstablished,
-  routeReply
+  routeReply,
+  newEdgeAdded,
 }
