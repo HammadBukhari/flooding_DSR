@@ -2,5 +2,7 @@ enum NodeState{
   idle,
   busy,
   packetDrop,
-  connectionLoss
+  connectionLoss,
+  connectionEstablished,
+  routeReply
 }

@@ -24,6 +24,8 @@ dependencies:
   get_it: ^4.0.1
   dartz: ^0.8.9
   uuid: ^2.0.4
+  fluttertoast: ^4.0.1
+
 
 
 

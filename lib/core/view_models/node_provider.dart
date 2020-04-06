@@ -1,20 +1,33 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:connectivity/connectivity.dart';
+import 'package:iot_assignment_1/core/enum/DSR_packet_type.dart';
+import 'package:iot_assignment_1/core/enum/NetworkMessageType.dart';
+import 'package:iot_assignment_1/core/models/ConnectionRequest.dart';
+import 'package:iot_assignment_1/core/models/DSRNode.dart';
+import 'package:iot_assignment_1/core/models/DSRPacket.dart';
 import 'package:iot_assignment_1/core/models/Edge.dart';
 import 'package:iot_assignment_1/core/models/GlobalEdge.dart';
 import 'package:iot_assignment_1/core/models/LocalEdge.dart';
+import 'package:iot_assignment_1/core/models/NetworkMessage.dart';
 import 'package:iot_assignment_1/core/models/node.dart';
 import 'package:iot_assignment_1/core/models/packet.dart';
 import 'package:iot_assignment_1/core/services/flooding.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:math';
-
-import 'package:iot_assignment_1/locator.dart';
+import 'package:iot_assignment_1/core/enum/packet_type.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:uuid/uuid.dart';
 
 class NodeProvider extends ChangeNotifier {
   List<Node> nodes = [];
   String deviceIdentifier = "A";
   int _rowCount = 10;
+  int get rowCount => _rowCount;
   int _columnCount = 4;
+  int port = 1999;
+  final path = "file.txt";
   Random random = Random();
   // Probablitiy of node movement from 0 to 1.0 inclusive
   double _mobilityProbability = 0.0;
@@ -34,9 +47,95 @@ class NodeProvider extends ChangeNotifier {
     this._packetDropProbability = packetDropProbability;
   }
 
-  void flood(String source, String dest, Packet msg) {
+  Future<String> getDeviceLocalIp() {
+    return Connectivity().getWifiIP();
+  }
+
+  Future<void> sendNewGlobalEdgeOverNetwork(
+      Node sourceNode, String destNid, String destIp) async {
+    String myIp = await getDeviceLocalIp();
+    print(myIp);
+    final networkMessage = NetworkMessage(
+      type: NetworkMessageType.connectionRequest,
+      senderUid: sourceNode.nid,
+      receiverUid: destNid,
+      packet: ConnectionRequest(
+          edge: GlobalEdge(sourceNode.nid, myIp, port.toString())),
+    );
+    HttpClientRequest request = await HttpClient().post(destIp, port, path)
+      ..headers.contentType = ContentType.json
+      ..write(networkMessage.toJson());
+    HttpClientResponse response = await request.close();
+    await utf8.decoder.bind(response /*5*/).forEach((element) {
+      Fluttertoast.showToast(msg: element);
+      print(element);
+    });
+    // adding globalEdge on this client
+    searchNodeByNid(sourceNode.nid)
+        .addGlobalEdge(GlobalEdge(destNid, destIp, port.toString()));
+  }
+
+  Future<void> initNetwork() async {
+    String ip = await getDeviceLocalIp();
+    var server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+    await for (var req in server) {
+      ContentType contentType = req.headers.contentType;
+      HttpResponse response = req.response;
+      if (req.method == 'POST' && contentType?.mimeType == 'application/json') {
+        try {
+          String content = await utf8.decoder.bind(req).join();
+          // var data = jsonDecode(content) as Map;
+          NetworkMessage networkMessage = NetworkMessage.fromJson(content);
+          if (networkMessage.type == NetworkMessageType.connectionRequest) {
+            ConnectionRequest connectionRequest = networkMessage.packet;
+            Fluttertoast.showToast(msg: networkMessage.packet.toString());
+            searchNodeByNid(networkMessage.receiverUid)
+                .addGlobalEdge(connectionRequest.edge);
+            req.response
+              ..statusCode = HttpStatus.ok
+              ..write('Edge added');
+          } else if (networkMessage.type == NetworkMessageType.flood) {
+            Packet packet = networkMessage.packet;
+            searchNodeByNid(networkMessage.receiverUid).broadcast(packet);
+            req.response
+              ..statusCode = HttpStatus.ok
+              ..write('broadcasted over network');
+          } else if (networkMessage.type == NetworkMessageType.DSR) {
+            DSRPacket packet = networkMessage.packet;
+            if (packet.messageType == DSRPacketType.RREP) {
+              (searchNodeByNid(networkMessage.receiverUid) as DSRNode)
+                  .routeReply(packet);
+            } else if (packet.messageType == DSRPacketType.RREQ) {
+              (searchNodeByNid(networkMessage.receiverUid) as DSRNode)
+                  .routeRequest(packet);
+            } else if (packet.messageType == DSRPacketType.MESG) {
+              (searchNodeByNid(networkMessage.receiverUid) as DSRNode)
+                  .directMessage(packet);
+            }
+          }
+        } catch (e) {
+          response
+            ..statusCode = HttpStatus.internalServerError
+            ..write('Exception: $e.');
+        }
+      } else {
+        response
+          ..statusCode = HttpStatus.methodNotAllowed
+          ..write('Unsupported request: ${req.method}.');
+      }
+      await response.close();
+    }
+  }
+
+  void flood(String source, String dest, String msg) {
     var flood = Flooding(); //getIt<Flooding>();
     flood.initFlooding(nodes, source, dest, msg);
+  }
+
+  void makeDSRRreq(String source, String dest, String msg) {
+    final sourceNode = searchNodeByNid(source) as DSRNode;
+    final packet = DSRPacket(Uuid().v1().toString(), msg, source, dest);
+    sourceNode.routeRequest(packet);
   }
 
   bool makeConnection() {
@@ -44,7 +143,7 @@ class NodeProvider extends ChangeNotifier {
   }
 
   // device identifer must must set before calling initNodes
-  void initNodes() {
+  void initNodes(AlgorithmType type) {
     for (int y = 0; y < _rowCount; y++) {
       for (int x = 0; x < _columnCount; x++) {
         // if x = 0  no left edge
@@ -76,10 +175,54 @@ class NodeProvider extends ChangeNotifier {
                 "$deviceIdentifier${y + 1}$x")); // Ayx A02 -> left A01
           }
         }
-
-        nodes.add(Node(deviceIdentifier : deviceIdentifier ,x: x, y: y, nid: "$deviceIdentifier$y$x", edges: edges));
+        if (type == AlgorithmType.Flooding)
+          nodes.add(Node(
+              deviceIdentifier: deviceIdentifier,
+              x: x,
+              y: y,
+              nid: "$deviceIdentifier$y$x",
+              edges: edges));
+        else
+          nodes.add(
+              DSRNode("$deviceIdentifier$y$x", edges, x, y, deviceIdentifier));
       }
     }
+  }
+
+  Future<void> broadcastOverNetwork(
+      Node sender, GlobalEdge edge, Packet packet) async {
+    final networkMessage = NetworkMessage(
+      type: NetworkMessageType.flood,
+      receiverUid: edge.nid,
+      senderUid: sender.nid,
+      packet: packet,
+    );
+    HttpClientRequest request = await HttpClient().post(edge.ip, port, path)
+      ..headers.contentType = ContentType.json
+      ..write(networkMessage.toJson());
+    HttpClientResponse response = await request.close();
+    await utf8.decoder.bind(response /*5*/).forEach((element) {
+      Fluttertoast.showToast(msg: element);
+      print(element);
+    });
+  }
+
+  Future<void> dsrOverNetwork(
+      Node sender, GlobalEdge edge, Packet packet) async {
+    final networkMessage = NetworkMessage(
+      type: NetworkMessageType.DSR,
+      receiverUid: edge.nid,
+      senderUid: sender.nid,
+      packet: packet,
+    );
+    HttpClientRequest request = await HttpClient().post(edge.ip, port, path)
+      ..headers.contentType = ContentType.json
+      ..write(networkMessage.toJson());
+    HttpClientResponse response = await request.close();
+    await utf8.decoder.bind(response /*5*/).forEach((element) {
+      Fluttertoast.showToast(msg: element);
+      print(element);
+    });
   }
 
   Node searchNodeByNid(String nid) {

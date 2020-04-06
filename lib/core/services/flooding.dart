@@ -1,16 +1,16 @@
-import 'package:dartz/dartz.dart';
-import 'package:iot_assignment_1/core/enum/node_state.dart';
-import 'package:iot_assignment_1/core/models/Edge.dart';
+
 import 'package:iot_assignment_1/core/models/node.dart';
 import 'package:iot_assignment_1/core/models/packet.dart';
+import 'package:uuid/uuid.dart';
 
 class Flooding {
   void initFlooding(
-      List<Node> nodes, String source, String destination, Packet msg) {
+      List<Node> nodes, String source, String destination, String msg) {
     Node sourceNode = searchNodeByNid(nodes, source);
     Node destNode = searchNodeByNid(nodes, destination);
+    final packet = Packet(Uuid().v1().toString(), msg,source, destination);
     // flood(nodes, sourceNode, destNode, msg);
-    sourceNode.broadcast(destNode, msg);
+    sourceNode.broadcast(packet);
   }
 
   // void flood(List<Node> nodes, Node source, Node dest, Packet msg) {

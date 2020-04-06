@@ -1,27 +1,30 @@
-import 'dart:async';
+import 'dart:math';
 import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
-import 'package:connectivity/connectivity.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:iot_assignment_1/core/models/DSRPacket.dart';
 import 'package:iot_assignment_1/locator.dart';
+import 'package:iot_assignment_1/core/enum/packet_type.dart';
+import 'package:uuid/uuid.dart';
 
 import 'core/enum/node_state.dart';
 import 'core/models/packet.dart';
-import 'core/services/flooding.dart';
 import 'core/view_models/node_provider.dart'; // connectivity
 
 final _formKey = GlobalKey<FormState>();
 
 void main() {
   setup();
-
-  var provider = getIt<NodeProvider>();
-  provider.initNodes();
+  WidgetsFlutterBinding.ensureInitialized();
+  final deviceId = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"];
+  final provider = getIt<NodeProvider>();
+  provider.setDeviceIdentifier(deviceId[Random().nextInt(deviceId.length)]);
+  provider.initNodes(AlgorithmType.DSR);
+  provider.initNetwork();
   runApp(MyApp());
-
 }
 
 class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -37,7 +40,7 @@ class MyApp extends StatelessWidget {
 
 class MyHomePage extends StatelessWidget {
   final provider = getIt<NodeProvider>();
-  
+
   Widget buildNodesGrid(BuildContext context) {
     return GridView.builder(
       itemCount: provider.nodes.length,
@@ -47,63 +50,76 @@ class MyHomePage extends StatelessWidget {
         return StreamBuilder<Either<NodeState, Packet>>(
             stream: provider.nodes[index].nodeStatusStream,
             builder: (context, snapshot) {
-              var color = Colors.grey;
+              var color = Colors.white;
               if (snapshot.hasData) {
                 snapshot.data.fold((l) {
                   if (l == NodeState.busy) {
                     color = Colors.red;
+                  } else if (l == NodeState.routeReply) {
+                    color = Colors.yellow;
                   }
                 }, (r) => color = Colors.green);
               }
               return Card(
-            color: color,
-            child: new InkWell(
-              onTap: () {
-                print("tapped");
-              },
-              child: Container(
-                width: 100.0,
-                height: 100.0,
-                padding: const EdgeInsets.all(8),
-                child: Builder(builder: (BuildContext context) {
-                  var stackWidgets = <Widget>[];
-                  stackWidgets.add(Align(
-                        alignment: Alignment.center,
-                        child: new Text(
-                          provider.nodes[index].nid,
-                          style: TextStyle(fontSize: 22.0),
+                color: color,
+                child: new InkWell(
+                  onTap: () {
+                    Fluttertoast.showToast(
+                        msg: provider.nodes[index].edges.fold(
+                            "",
+                            (previousValue, element) =>
+                                "$previousValue \n ${element.toString()}"));
+                  },
+                  child: Container(
+                    width: 100.0,
+                    height: 100.0,
+                    padding: const EdgeInsets.all(8),
+                    child: Builder(builder: (BuildContext context) {
+                      var stackWidgets = <Widget>[];
+                      stackWidgets.add(
+                        Align(
+                          alignment: Alignment.center,
+                          child: new Text(
+                            provider.nodes[index].nid,
+                            style: TextStyle(fontSize: 22.0),
+                          ),
                         ),
-                      ),);
-                  if (provider.nodes[index].hasLeftEdge())
-                  stackWidgets.add(Align(
-                        alignment: Alignment.centerLeft,
-                        child: buildVerticalNode(context),
-                      ),);
-                  if (provider.nodes[index].hasRightEdge())
-                  stackWidgets.add(
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: buildVerticalNode(context),
-                      ),);
-                  if (provider.nodes[index].hasUpEdge())
-                  stackWidgets.add(Align(
-                        alignment: Alignment.topCenter,
-                        child: buildHorizontalNode(context),
-                      ),);
-                  if (provider.nodes[index].hasDownEdge())
-                  stackWidgets.add(Align(
-                        alignment: Alignment.bottomCenter,
-                        child: buildHorizontalNode(context),
-                      ),);
-                  
-                  return Stack(
-                    children: stackWidgets
-                  );
-                }),
-                alignment: Alignment(0.0, 0.0),
-              ),
-            ),
-          );
+                      );
+                      if (provider.nodes[index].hasLeftEdge())
+                        stackWidgets.add(
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: buildVerticalNode(context),
+                          ),
+                        );
+                      if (provider.nodes[index].hasRightEdge())
+                        stackWidgets.add(
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: buildVerticalNode(context),
+                          ),
+                        );
+                      if (provider.nodes[index].hasUpEdge())
+                        stackWidgets.add(
+                          Align(
+                            alignment: Alignment.topCenter,
+                            child: buildHorizontalNode(context),
+                          ),
+                        );
+                      if (provider.nodes[index].hasDownEdge())
+                        stackWidgets.add(
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: buildHorizontalNode(context),
+                          ),
+                        );
+
+                      return Stack(children: stackWidgets);
+                    }),
+                    alignment: Alignment(0.0, 0.0),
+                  ),
+                ),
+              );
             });
       },
     );
@@ -130,10 +146,23 @@ class MyHomePage extends StatelessWidget {
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          provider.flood('A01', "A33", Packet(message: "Hello"));
+          provider.makeDSRRreq("E03", "A62", "Heello");
+          // provider.sendNewGlobalEdgeOverNetwork(
+          //     provider.nodes[0], "A00", "192.168.1.10");
+          // provider.makeDSRRreq("B03", "F52", "msg");
         },
       ),
-      appBar: AppBar(),
+      appBar: AppBar(
+        title: FutureBuilder(
+          future: provider.getDeviceLocalIp(),
+          builder: (BuildContext context, AsyncSnapshot snapshot) {
+            if (snapshot.hasData)
+              return Text(snapshot.data.toString());
+            else
+              return CircularProgressIndicator();
+          },
+        ),
+      ),
       body: buildNodesGrid(context),
     );
   }
