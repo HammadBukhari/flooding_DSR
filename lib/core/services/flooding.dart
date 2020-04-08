@@ -7,7 +7,6 @@ class Flooding {
   void initFlooding(
       List<Node> nodes, String source, String destination, String msg) {
     Node sourceNode = searchNodeByNid(nodes, source);
-    Node destNode = searchNodeByNid(nodes, destination);
     final packet = Packet(Uuid().v1().toString(), msg,source, destination);
     // flood(nodes, sourceNode, destNode, msg);
     sourceNode.broadcast(packet);

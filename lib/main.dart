@@ -21,6 +21,7 @@ void main() {
   provider.setDeviceIdentifier(deviceId[Random().nextInt(deviceId.length)]);
   provider.initNodes(AlgorithmType.DSR);
   provider.initNetwork();
+
   runApp(MyApp());
 }
 
@@ -146,10 +147,11 @@ class MyHomePage extends StatelessWidget {
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          provider.makeDSRRreq("E03", "A62", "Heello");
+          // provider.makeDSRRreq("E03", "A62", "Heello");
           // provider.sendNewGlobalEdgeOverNetwork(
           //     provider.nodes[0], "A00", "192.168.1.10");
-          // provider.makeDSRRreq("B03", "F52", "msg");
+          provider.makeDSRRreq("C00", "C50", "msg");
+          // provider.flood("A00", "A62", "Hello");
         },
       ),
       appBar: AppBar(

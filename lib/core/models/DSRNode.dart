@@ -150,11 +150,13 @@ class DSRNode extends Node {
       await Future.delayed(Duration(milliseconds: 750));
       if (this.nid == packet.destinationNid) {
         packet.headerNids.add(nid);
-        final replayPacket = DSRPacket(packet.uid, packet.message,
-            packet.sourceNid, packet.destinationNid);
-        replayPacket.uid = "${packet.uid}RREP";
-        replayPacket.headerNids = packet.headerNids;
-        routeReply(replayPacket);
+        routeReply(DSRPacket(
+          "${packet.uid}RREP",
+          packet.message,
+          packet.sourceNid,
+          packet.destinationNid,
+          headerNids: packet.headerNids,
+        ));
         streamController.sink.add(Left(NodeState.idle));
         return;
       }

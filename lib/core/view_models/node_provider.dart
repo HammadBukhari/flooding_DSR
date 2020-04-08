@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:connectivity/connectivity.dart';
 import 'package:iot_assignment_1/core/enum/DSR_packet_type.dart';
 import 'package:iot_assignment_1/core/enum/NetworkMessageType.dart';
@@ -19,6 +18,18 @@ import 'dart:math';
 import 'package:iot_assignment_1/core/enum/packet_type.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:uuid/uuid.dart';
+
+class User {
+  int uid;
+  String name;
+  String photoUrl;
+}
+
+Map<String, dynamic> user = {
+  "uid": 123,
+  "name": "Hammad Ali",
+  "photoUrl": "Example.com",
+};
 
 class NodeProvider extends ChangeNotifier {
   List<Node> nodes = [];
@@ -66,10 +77,11 @@ class NodeProvider extends ChangeNotifier {
       ..headers.contentType = ContentType.json
       ..write(networkMessage.toJson());
     HttpClientResponse response = await request.close();
-    await utf8.decoder.bind(response /*5*/).forEach((element) {
+    await utf8.decoder.bind(response).forEach((element) {
       Fluttertoast.showToast(msg: element);
       print(element);
     });
+    
     // adding globalEdge on this client
     searchNodeByNid(sourceNode.nid)
         .addGlobalEdge(GlobalEdge(destNid, destIp, port.toString()));
@@ -85,6 +97,7 @@ class NodeProvider extends ChangeNotifier {
         try {
           String content = await utf8.decoder.bind(req).join();
           // var data = jsonDecode(content) as Map;
+
           NetworkMessage networkMessage = NetworkMessage.fromJson(content);
           if (networkMessage.type == NetworkMessageType.connectionRequest) {
             ConnectionRequest connectionRequest = networkMessage.packet;
@@ -144,6 +157,7 @@ class NodeProvider extends ChangeNotifier {
 
   // device identifer must must set before calling initNodes
   void initNodes(AlgorithmType type) {
+    nodes.clear();
     for (int y = 0; y < _rowCount; y++) {
       for (int x = 0; x < _columnCount; x++) {
         // if x = 0  no left edge
