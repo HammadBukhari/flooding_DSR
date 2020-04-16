@@ -6,7 +6,6 @@ import 'package:iot_assignment_1/core/enum/node_state.dart';
 import 'package:iot_assignment_1/core/models/node.dart';
 import 'package:iot_assignment_1/core/models/packet.dart';
 import 'package:iot_assignment_1/core/view_models/node_provider.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../locator.dart';
 import 'DSRPacket.dart';

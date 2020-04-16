@@ -1,8 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+
 import 'package:connectivity/connectivity.dart';
+import 'package:flutter/widgets.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:iot_assignment_1/core/enum/DSR_packet_type.dart';
 import 'package:iot_assignment_1/core/enum/NetworkMessageType.dart';
+import 'package:iot_assignment_1/core/enum/packet_type.dart';
 import 'package:iot_assignment_1/core/models/ConnectionRequest.dart';
 import 'package:iot_assignment_1/core/models/DSRNode.dart';
 import 'package:iot_assignment_1/core/models/DSRPacket.dart';
@@ -13,10 +18,6 @@ import 'package:iot_assignment_1/core/models/NetworkMessage.dart';
 import 'package:iot_assignment_1/core/models/node.dart';
 import 'package:iot_assignment_1/core/models/packet.dart';
 import 'package:iot_assignment_1/core/services/flooding.dart';
-import 'package:flutter/widgets.dart';
-import 'dart:math';
-import 'package:iot_assignment_1/core/enum/packet_type.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:uuid/uuid.dart';
 
 class NodeProvider extends ChangeNotifier {
@@ -37,6 +38,7 @@ class NodeProvider extends ChangeNotifier {
   //
   void setDeviceIdentifier(String deviceIdentifier) {
     this.deviceIdentifier = deviceIdentifier;
+    initNodes(AlgorithmType.DSR);
   }
 
   bool setMobilityProbability(String mobilityProbability) {
@@ -56,7 +58,7 @@ class NodeProvider extends ChangeNotifier {
       return false;
     }
   }
-
+  
   Future<String> getDeviceLocalIp() {
     return Connectivity().getWifiIP();
   }
