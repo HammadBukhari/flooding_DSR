@@ -1,11 +1,7 @@
 import 'dart:convert';
 
 import 'package:iot_assignment_1/core/enum/DSR_packet_type.dart';
-import 'package:iot_assignment_1/core/models/GlobalEdge.dart';
-import 'package:iot_assignment_1/core/models/LocalEdge.dart';
 import 'package:iot_assignment_1/core/models/packet.dart';
-
-import 'Edge.dart';
 
 class DSRPacket extends Packet {
   List<String> headerNids = [];
@@ -31,9 +27,8 @@ class DSRPacket extends Packet {
 
   @override
   bool operator ==(Object o) {
-    if (identical(this, o)) return true;
-
-    return o is DSRPacket && o.uid == uid;
+    
+    return o is DSRPacket && o.uid == uid && o.messageType == messageType && o.message == message;
   }
 
   @override

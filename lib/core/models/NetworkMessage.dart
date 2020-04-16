@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'dart:ffi';
 
 import 'package:iot_assignment_1/core/enum/NetworkMessageType.dart';
 import 'package:iot_assignment_1/core/models/ConnectionRequest.dart';
 import 'package:iot_assignment_1/core/models/DSRPacket.dart';
-import 'package:iot_assignment_1/core/models/GlobalEdge.dart';
 import 'package:iot_assignment_1/core/models/packet.dart';
 
 class NetworkMessage {

@@ -1,5 +1,4 @@
 import "dart:convert";
-import 'dart:convert';
 
 class Edge {
   String nid;

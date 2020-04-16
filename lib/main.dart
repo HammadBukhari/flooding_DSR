@@ -56,10 +56,17 @@ class MyHomePage extends StatelessWidget {
                 snapshot.data.fold((l) {
                   if (l == NodeState.busy) {
                     color = Colors.red;
+                  } else if (l == NodeState.routeError) {
+                    color = Colors.pink;
                   } else if (l == NodeState.routeReply) {
                     color = Colors.yellow;
+                  } else if (l == NodeState.packetDrop) {
+                    color = Colors.purple;
                   }
-                }, (r) => color = Colors.green);
+                }, (r) {
+                  color = Colors.green;
+                  print(r.message);
+                });
               }
               return Card(
                 color: color,
@@ -149,9 +156,9 @@ class MyHomePage extends StatelessWidget {
         onPressed: () {
           // provider.makeDSRRreq("E03", "A62", "Heello");
           // provider.sendNewGlobalEdgeOverNetwork(
-          //     provider.nodes[0], "A00", "192.168.1.10");
-          provider.makeDSRRreq("C00", "C50", "msg");
-          // provider.flood("A00", "A62", "Hello");
+          // provider.nodes[0], "E00", "192.168.10.4");
+          provider.makeDSRRreq("A01", "A31", "msg");
+          // provider.flood("I00", "I62", "Hello");
         },
       ),
       appBar: AppBar(

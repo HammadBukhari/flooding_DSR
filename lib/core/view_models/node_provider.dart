@@ -19,18 +19,6 @@ import 'package:iot_assignment_1/core/enum/packet_type.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:uuid/uuid.dart';
 
-class User {
-  int uid;
-  String name;
-  String photoUrl;
-}
-
-Map<String, dynamic> user = {
-  "uid": 123,
-  "name": "Hammad Ali",
-  "photoUrl": "Example.com",
-};
-
 class NodeProvider extends ChangeNotifier {
   List<Node> nodes = [];
   String deviceIdentifier = "A";
@@ -40,22 +28,33 @@ class NodeProvider extends ChangeNotifier {
   int port = 1999;
   final path = "file.txt";
   Random random = Random();
-  // Probablitiy of node movement from 0 to 1.0 inclusive
-  double _mobilityProbability = 0.0;
 
-  // Probablility of packet drop from 0 to 1.0 inclusive
-  double _packetDropProbability = 0.0;
+  // Probablitiy of node movement from 0 to 100 inclusive
+  double mobilityProbability = 1;
+
+  // Probablility of packet drop from 0 to 100 inclusive
+  double packetDropProbability = 1;
   //
   void setDeviceIdentifier(String deviceIdentifier) {
     this.deviceIdentifier = deviceIdentifier;
   }
 
-  void setMobilityProbability(double mobilityProbability) {
-    this._mobilityProbability = mobilityProbability;
+  bool setMobilityProbability(String mobilityProbability) {
+    try {
+      this.mobilityProbability = double.parse(mobilityProbability);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
-  void setPacketDropProbability(double packetDropProbability) {
-    this._packetDropProbability = packetDropProbability;
+  bool setPacketDropProbability(String packetDropProbability) {
+    try {
+      this.packetDropProbability = double.parse(packetDropProbability);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   Future<String> getDeviceLocalIp() {
@@ -81,14 +80,13 @@ class NodeProvider extends ChangeNotifier {
       Fluttertoast.showToast(msg: element);
       print(element);
     });
-    
+
     // adding globalEdge on this client
     searchNodeByNid(sourceNode.nid)
         .addGlobalEdge(GlobalEdge(destNid, destIp, port.toString()));
   }
 
   Future<void> initNetwork() async {
-    String ip = await getDeviceLocalIp();
     var server = await HttpServer.bind(InternetAddress.anyIPv4, port);
     await for (var req in server) {
       ContentType contentType = req.headers.contentType;
@@ -124,6 +122,9 @@ class NodeProvider extends ChangeNotifier {
             } else if (packet.messageType == DSRPacketType.MESG) {
               (searchNodeByNid(networkMessage.receiverUid) as DSRNode)
                   .directMessage(packet);
+            } else if (packet.messageType == DSRPacketType.RERR) {
+              (searchNodeByNid(networkMessage.receiverUid) as DSRNode)
+                  .routeError(packet);
             }
           }
         } catch (e) {
@@ -152,7 +153,7 @@ class NodeProvider extends ChangeNotifier {
   }
 
   bool makeConnection() {
-    return !(random.nextInt(10) == 1);
+    return !(random.nextInt(100-mobilityProbability.toInt()) == 1);
   }
 
   // device identifer must must set before calling initNodes

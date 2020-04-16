@@ -1,4 +1,3 @@
-import "dart:convert";
 import 'Edge.dart';
 
 class LocalEdge extends Edge {

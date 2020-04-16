@@ -6,6 +6,8 @@ import 'package:iot_assignment_1/core/enum/node_state.dart';
 import 'package:iot_assignment_1/core/models/node.dart';
 import 'package:iot_assignment_1/core/models/packet.dart';
 import 'package:iot_assignment_1/core/view_models/node_provider.dart';
+import 'package:uuid/uuid.dart';
+
 import '../../locator.dart';
 import 'DSRPacket.dart';
 import 'Edge.dart';
@@ -21,12 +23,19 @@ class DSRNode extends Node {
             y: y,
             deviceIdentifier: deviceIdentifer);
   List<List<String>> _cache = [];
+  @override
+  int calcualteBandwidthRequired(Packet packet) {
+    return packet.message.length +
+        (packet as DSRPacket).headerNids.fold(
+            0, (previousValue, element) => previousValue + element.length);
+  }
+
   Future<void> routeReply(DSRPacket packet) async {
-    if (!isPacketAlreadyBroadcasted(packet)) {
+    if (!isPacketAlreadyBroadcasted(packet) && shouldForwardPacket()) {
       //print("RREP reached at $this");
       streamController.sink.add(Left(NodeState.routeReply));
       alreadyBroadcasted.add(packet);
-      await Future.delayed(Duration(milliseconds: 750));
+      await processPacket(packet);
       addInCache(packet.headerNids);
 
       if (this.nid == packet.sourceNid) {
@@ -37,9 +46,7 @@ class DSRNode extends Node {
       }
       for (final edge in edges) {
         if (edge is LocalEdge) {
-          final nodeToSend =
-              getIt<NodeProvider>().searchNodeByNid(edge.nid) as DSRNode;
-          nodeToSend.routeReply(packet);
+          (lanConnection(edge.nid) as DSRNode)?.routeReply(packet);
         } else if (edge is GlobalEdge) {
           packet.messageType = DSRPacketType.RREP;
           getIt<NodeProvider>().dsrOverNetwork(this, edge, packet);
@@ -58,6 +65,50 @@ class DSRNode extends Node {
       }
     }
     return null;
+  }
+
+  Future<void> routeError(DSRPacket packet) async {
+    if (!isPacketAlreadyBroadcasted(packet) && shouldForwardPacket()) {
+      alreadyBroadcasted.add(packet);
+      streamController.sink.add(Left(NodeState.routeError));
+      await processPacket(packet);
+      removeInCache(packet.message);
+      if (this.nid == packet.sourceNid) {
+        streamController.sink.add(Left(NodeState.routeError));
+        // // restarting the whole DSR process
+        // packet.messageType = DSRPacketType.RREQ;
+        // // new id so nodes do forward it
+        // packet.uid = Uuid().v1().toString();
+
+        // routeRequest(DSRPacket.copyFrom(packet));
+        return;
+      }
+      for (final edge in edges) {
+        if (edge is LocalEdge) {
+          (lanConnection(edge.nid) as DSRNode)?.routeError(packet);
+        } else if (edge is GlobalEdge) {
+          getIt<NodeProvider>().dsrOverNetwork(this, edge, packet);
+        }
+      }
+      streamController.sink.add(Left(NodeState.idle));
+    }
+  }
+
+  void removeInCache(String pair) {
+    final firstNode = pair.substring(0, 2);
+    final secondNode = pair.substring(3, 5);
+    // check if [_cache] contains the first node
+    for (final cache in _cache) {
+      final indexOfFirstNode = cache.indexOf(firstNode);
+      if (indexOfFirstNode == -1) continue;
+
+      // if [firstNode] is last item in cache list
+      // then no possiblity of pair
+      if (cache.last == firstNode) return;
+      // if the next element of [firstNode] is [secondNode] then
+      // the corrupted cache is found and should be removed
+      if (cache[indexOfFirstNode + 1] == secondNode) _cache.remove(cache);
+    }
   }
 
   void addInCache(List<String> toAdd) {
@@ -85,8 +136,10 @@ class DSRNode extends Node {
     // finally add it to cache list
     _cache.add(toAdd);
     print("${this.nid} added $toAdd");
+    print("${this}'s cache");
+    _cache.forEach(print);
     // set a callback to purge this cache
-    Future.delayed(Duration(seconds: 60), () {
+    Future.delayed(Duration(minutes: 60), () {
       _cache.remove(toAdd);
       // purge cache after 60 seconds
       print("purging ${this.nid}'s $toAdd");
@@ -95,24 +148,13 @@ class DSRNode extends Node {
 
   Future<void> directMessage(DSRPacket packet) async {
     streamController.sink.add(Left(NodeState.busy));
-    await Future.delayed(Duration(milliseconds: 750));
+      await processPacket(packet);
     addInCache(packet.headerNids);
     if (this.nid == packet.destinationNid) {
       streamController.sink.add(Right(packet));
       print("RRRRRRRRRRRRRRRRRRRRR");
       return;
     }
-    // if (edges.contains(packet.headerNids[1])) {
-    //   packet.headerNids.removeAt(0);
-    //   final nextEdge = packet.headerNids[0];
-    //   if (nextEdge is LocalEdge) {
-    //     final nodeToSend = getIt<NodeProvider>()
-    //         .searchNodeByNid(packet.headerNids[0].nid) as DSRNode;
-    //     nodeToSend.directMessage(packet);
-    //   } else {
-    //     packet.messageType = DSRPacketType.MESG;
-    //     getIt<NodeProvider>().dsrOverNetwork(this, nextEdge, packet);
-    //   }
     packet.headerNids.removeAt(0);
     Edge edgeToForward;
     for (final edge in this.edges) {
@@ -123,15 +165,18 @@ class DSRNode extends Node {
     }
     if (edgeToForward != null) {
       if (edgeToForward is LocalEdge) {
-        final nodeToSend =
-            getIt<NodeProvider>().searchNodeByNid(edgeToForward.nid) as DSRNode;
-        nodeToSend.directMessage(packet);
+        (lanConnection(edgeToForward.nid) as DSRNode)?.directMessage(packet);
       } else {
         packet.messageType = DSRPacketType.MESG;
         getIt<NodeProvider>().dsrOverNetwork(this, edgeToForward, packet);
       }
     } else {
       // edge is remove sent route error
+      packet.messageType = DSRPacketType.RERR;
+      // set message to the two pair of which connection
+      // is destroyed
+      packet.message = "${this.nid}${packet.headerNids.first}";
+      routeError(DSRPacket.copyFrom(packet));
     }
     streamController.sink.add(Left(NodeState.idle));
   }
@@ -144,10 +189,10 @@ class DSRNode extends Node {
   }
 
   Future<void> routeRequest(DSRPacket packet) async {
-    if (!isPacketAlreadyBroadcasted(packet)) {
+    if (!isPacketAlreadyBroadcasted(packet) && shouldForwardPacket()) {
       alreadyBroadcasted.add(packet);
       streamController.sink.add(Left(NodeState.busy));
-      await Future.delayed(Duration(milliseconds: 750));
+      await processPacket(packet);
       if (this.nid == packet.destinationNid) {
         packet.headerNids.add(nid);
         routeReply(DSRPacket(
@@ -177,9 +222,8 @@ class DSRNode extends Node {
       packet.headerNids.add(nid);
       for (final edge in edges) {
         if (edge is LocalEdge) {
-          final nodeToSend =
-              getIt<NodeProvider>().searchNodeByNid(edge.nid) as DSRNode;
-          nodeToSend.routeRequest(DSRPacket.copyFrom(packet));
+          (lanConnection(edge.nid) as DSRNode)
+              ?.routeRequest(DSRPacket.copyFrom(packet));
         } else if (edge is GlobalEdge) {
           packet.messageType = DSRPacketType.RREQ;
           getIt<NodeProvider>()
