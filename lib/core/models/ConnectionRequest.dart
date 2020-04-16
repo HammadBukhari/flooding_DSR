@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:iot_assignment_1/core/models/Edge.dart';
 import 'package:iot_assignment_1/core/models/GlobalEdge.dart';
 
 class ConnectionRequest {

@@ -1,23 +1,22 @@
 import 'dart:math';
-import 'package:dartz/dartz.dart';
+
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'package:iot_assignment_1/core/models/DSRPacket.dart';
-import 'package:iot_assignment_1/locator.dart';
 import 'package:iot_assignment_1/core/enum/packet_type.dart';
-import 'package:uuid/uuid.dart';
+import 'package:iot_assignment_1/locator.dart';
+import 'package:iot_assignment_1/ui/provider/SliderProvider.dart';
+import 'package:iot_assignment_1/ui/views/tabbedForm_view.dart';
+import 'package:sliding_up_panel/sliding_up_panel.dart';
 
-import 'core/enum/node_state.dart';
-import 'core/models/packet.dart';
 import 'core/view_models/node_provider.dart'; // connectivity
+import 'ui/views/map_view.dart';
+import 'ui/views/settings_view.dart';
+final provider = getIt<NodeProvider>();
 
-final _formKey = GlobalKey<FormState>();
 
 void main() {
   setup();
   WidgetsFlutterBinding.ensureInitialized();
   final deviceId = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"];
-  final provider = getIt<NodeProvider>();
   provider.setDeviceIdentifier(deviceId[Random().nextInt(deviceId.length)]);
   provider.initNodes(AlgorithmType.DSR);
   provider.initNetwork();
@@ -25,7 +24,17 @@ void main() {
   runApp(MyApp());
 }
 
+
+
+class MyHomePage extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() {
+    return _MyHomePage();
+  }
+}
+
 class MyApp extends StatelessWidget {
+  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -39,123 +48,41 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatelessWidget {
-  final provider = getIt<NodeProvider>();
+class _MyHomePage extends State<MyHomePage> {
+  final sliderProvider = getIt<SliderProvider>();
+  int _selectedIndexForBottomNavigationBar = 0;
+  //1
+  List<Widget> pageList = List<Widget>();
 
-  Widget buildNodesGrid(BuildContext context) {
-    return GridView.builder(
-      itemCount: provider.nodes.length,
-      gridDelegate:
-          SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
-      itemBuilder: (BuildContext context, int index) {
-        return StreamBuilder<Either<NodeState, Packet>>(
-            stream: provider.nodes[index].nodeStatusStream,
-            builder: (context, snapshot) {
-              var color = Colors.white;
-              if (snapshot.hasData) {
-                snapshot.data.fold((l) {
-                  if (l == NodeState.busy) {
-                    color = Colors.red;
-                  } else if (l == NodeState.routeReply) {
-                    color = Colors.yellow;
-                  }
-                }, (r) => color = Colors.green);
-              }
-              return Card(
-                color: color,
-                child: new InkWell(
-                  onTap: () {
-                    Fluttertoast.showToast(
-                        msg: provider.nodes[index].edges.fold(
-                            "",
-                            (previousValue, element) =>
-                                "$previousValue \n ${element.toString()}"));
-                  },
-                  child: Container(
-                    width: 100.0,
-                    height: 100.0,
-                    padding: const EdgeInsets.all(8),
-                    child: Builder(builder: (BuildContext context) {
-                      var stackWidgets = <Widget>[];
-                      stackWidgets.add(
-                        Align(
-                          alignment: Alignment.center,
-                          child: new Text(
-                            provider.nodes[index].nid,
-                            style: TextStyle(fontSize: 22.0),
-                          ),
-                        ),
-                      );
-                      if (provider.nodes[index].hasLeftEdge())
-                        stackWidgets.add(
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: buildVerticalNode(context),
-                          ),
-                        );
-                      if (provider.nodes[index].hasRightEdge())
-                        stackWidgets.add(
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: buildVerticalNode(context),
-                          ),
-                        );
-                      if (provider.nodes[index].hasUpEdge())
-                        stackWidgets.add(
-                          Align(
-                            alignment: Alignment.topCenter,
-                            child: buildHorizontalNode(context),
-                          ),
-                        );
-                      if (provider.nodes[index].hasDownEdge())
-                        stackWidgets.add(
-                          Align(
-                            alignment: Alignment.bottomCenter,
-                            child: buildHorizontalNode(context),
-                          ),
-                        );
-
-                      return Stack(children: stackWidgets);
-                    }),
-                    alignment: Alignment(0.0, 0.0),
-                  ),
-                ),
-              );
-            });
-      },
-    );
+   @override
+  void initState() {
+    pageList.add(HomeMapView());
+    pageList.add(SettingsView());
+    super.initState();
   }
 
-  Widget buildHorizontalNode(BuildContext context) {
-    return Container(
-      color: Colors.lightGreen,
-      height: 20,
-      width: 5,
-    );
-  }
+ 
 
-  Widget buildVerticalNode(BuildContext context) {
-    return Container(
-      color: Colors.lightGreen,
-      height: 5,
-      width: 20,
-    );
+  //2
+  void _onItemTappedForBottomNavigationBar(int index) {
+    setState(() {
+      _selectedIndexForBottomNavigationBar = index;
+    });
   }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // provider.makeDSRRreq("E03", "A62", "Heello");
-          // provider.sendNewGlobalEdgeOverNetwork(
-          //     provider.nodes[0], "A00", "192.168.1.10");
-          provider.makeDSRRreq("C00", "C50", "msg");
-          // provider.flood("A00", "A62", "Hello");
-        },
-      ),
+    BorderRadiusGeometry radius = BorderRadius.only(
+      topLeft: Radius.circular(24.0),
+      topRight: Radius.circular(24.0),
+    );
+
+    //3
+    return new Scaffold(
       appBar: AppBar(
-        title: FutureBuilder(
+        
+        backgroundColor: Colors.white,
+
+         title: FutureBuilder(
           future: provider.getDeviceLocalIp(),
           builder: (BuildContext context, AsyncSnapshot snapshot) {
             if (snapshot.hasData)
@@ -164,8 +91,74 @@ class MyHomePage extends StatelessWidget {
               return CircularProgressIndicator();
           },
         ),
+
+
+        // title: Text(
+
+        //   _selectedIndexForBottomNavigationBar == 0 ? 'My Nodes' : 'Settings'
+
+        // ),
+        textTheme: TextTheme(
+            title: TextStyle(
+                color: Colors.black54,
+                fontSize: 20.0,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 3)),
       ),
-      body: buildNodesGrid(context),
+      body: SlidingUpPanel(
+        panel: _floatingPanel(),
+        collapsed: _floatingCollapsed(),
+        controller : sliderProvider.pc,
+        maxHeight: 350,
+        minHeight: 40,
+        body: IndexedStack(
+          index: _selectedIndexForBottomNavigationBar,
+          children: pageList,
+        ),
+        // SizedBox.shrink(
+        //     child: _listOfIconsForBottomNavigationBar
+        //         .elementAt(_selectedIndexForBottomNavigationBar)),
+       borderRadius: radius,
+        
+      ),
+      
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        onTap:
+            _onItemTappedForBottomNavigationBar, // this will be set when a new tab is tapped
+        items: [
+          BottomNavigationBarItem(
+              icon: new Icon(Icons.directions_boat), title: Text('Home')),
+          BottomNavigationBarItem(
+              icon: new Icon(Icons.settings), title: Text('Settings')),
+        ],
+        currentIndex: _selectedIndexForBottomNavigationBar,
+      ),
     );
   }
+
+  Widget _floatingCollapsed(){
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.all(Radius.circular(24.0))
+    ),
+    
+    child: Center(
+      child: Text(
+        "Tap on any node to send a message",
+        style: TextStyle(color: Colors.grey),
+      ),
+    ),
+  );
+}
+
+Widget _floatingPanel(){
+  return Container(
+    margin: const EdgeInsets.fromLTRB(24.0,24,24,0),
+    child: Center(
+      child: TabBarDemo(),
+    ),
+  );
+}
 }

@@ -4,8 +4,8 @@ import 'package:dartz/dartz.dart';
 import 'package:iot_assignment_1/core/enum/DSR_packet_type.dart';
 import 'package:iot_assignment_1/core/enum/node_state.dart';
 import 'package:iot_assignment_1/core/models/node.dart';
-import 'package:iot_assignment_1/core/models/packet.dart';
 import 'package:iot_assignment_1/core/view_models/node_provider.dart';
+
 import '../../locator.dart';
 import 'DSRPacket.dart';
 import 'Edge.dart';
